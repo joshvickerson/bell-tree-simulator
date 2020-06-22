@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>ACNH Bell Tree Simulator</title>
+
+    <style>
+        #data-display {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        #data-display tr {
+            border-bottom: 1px solid #555;
+            padding: 8px 0;
+        }
+
+        #data-display th,
+        #data-display td {
+            padding: 4px 8px;
+            border-left: 1px solid #555;
+        }
+
+        #data-display tr:nth-child(even) td {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        #data-display th:nth-child(1),
+        #data-display td:nth-child(1) {
+            border-left: none;
+        }
+
+        #data-display tbody td:last-child {
+            background-color: rgba(255, 50, 50, 0.15);
+            color: rgb(80, 0, 0);
+        }
+
+        #data-display tbody td:last-child.is-profit {
+            background-color: rgba(50, 255, 50, 0.15);
+            color: rgb(0, 80, 0);
+        }
+
+    </style>
+</head>
+
+<body>
+    <h1>So, you wanna plant more than 10,000 bells?</h1>
+    <form name="bellTreeSimulator" onsubmit="submitForm(event, this)">
+        <label for="bellsBuried">Bells You Bury</label>
+        <input id="bellsBuried" type="number" min="10001" max="99999" value="10001" />
+        <label for="weeks">Weeks to Simulate</label>
+        <input id="weeks" type="number" min="1" max="52" value="4" />
+        <button type="submit">Simulate Bell Trees</button>
+    </form>
+    <table id="data-display">
+        <thead>
+            <tr>
+                <th>Week</th>
+                <th>Weekly Cost</th>
+                <th>Weekly Earnings</th>
+                <th>Weekly Profit</th>
+                <th>Difference From Baseline Profit</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        function submitForm(event, form) {
+            event.preventDefault();
+            console.log(`Buried ${form[0].value} bells, for ${form[1].value} weeks`);
+            // force time period to a week
+            calcEarningsOverTime(7, parseInt(form[1].value), parseInt(form[0].value));
+        }
+        /**
+         * @param timePeriod - number of days a simulation should consider
+         * @param iterations - how many of the given time period you want to simulate
+         * @param bellsBuried - the number of bells you bury into the money tree spot
+         */
+        function calcEarningsOverTime(timePeriod, iterations, bellsBuried) {
+            if (bellsBuried <= 10000) {
+                console.log('Simulation only for burying greater than 10,000 bells');
+                return;
+            }
+            // other sanity checks
+
+            // array to keep track of earnings and costs per period
+            // each object in this array is 1 simulated time period
+            // this is used to build out the table of results
+            let periodResults = [];
+
+            // baseline of just burying 10,000 bells every time in the given period
+            // earning 30,000 bells per tree at a cost of 10,000
+            const periodBaselineCost = timePeriod * 10000;
+            const periodBaselineEarnings = timePeriod * 30000;
+            window.periodBaselineProfit = timePeriod * 20000;
+
+            // baseline costs and earnings, e.g. always burying 10,000
+            const baselineEarnings = (timePeriod * iterations * 30000);
+            const baselineCost = (timePeriod * iterations * 10000);
+
+            // the costs are fixed, so let's calculate them ahead of time
+            const periodCost = timePeriod * bellsBuried;
+            const totalCost = (timePeriod * iterations * bellsBuried);
+
+            // global counter for our earnings;
+            let totalBellsEarned = 0;
+
+            // loop for the number of times we want to simulate a given time period
+            for (let i = 0; i < iterations; i++) {
+                let periodEarnings = 0; // keep track of the bells we earned this period
+                // simulate all the trees for this time period
+                for (let treeCounter = 0; treeCounter < timePeriod; treeCounter++) {
+                    periodEarnings += simBellTree(bellsBuried);
+                }
+                totalBellsEarned += periodEarnings;
+                periodResults.push({
+                    cost: periodCost,
+                    earnings: periodEarnings,
+                });
+            }
+
+            console.log(`Simulated ${iterations} time periods of ${timePeriod} days, for bell trees of ${bellsBuried} bells.`);
+            console.log(`Total number of bells buried: ${totalCost}`);
+            console.log(`Simulated earnings: ${totalBellsEarned}`);
+            // provide a period by period breakdown
+            // difference in your earnings by risking > 10,000 over just always burying 10,000
+            console.log(`Difference from baseline: ${(totalBellsEarned - totalCost) - (baselineEarnings - baselineCost)}`);
+            console.log('Breakdown: ', periodResults);
+            renderTableOfEarnings(periodResults);
+        }
+
+        function simBellTree(bellsBuried) {
+            // the reported odds that the bell tree spawns bags of 10,000 rather than amount buried
+            const oddsTenThousand = 0.7;
+            // roll the dice
+            const randVal = Math.random();
+            // value of each bag spawned on the bell tree
+            let bagValue = (randVal <= oddsTenThousand ? 10000 : (bellsBuried));
+
+            // total bells from bell tree is 3 bags
+            // console.log(`Bell tree spawned: ${bagValue * 3}`);
+            return bagValue * 3;
+        }
+
+        function renderTableOfEarnings(earningsData) {
+            console.log('building table with data:', earningsData)
+            // grab the table body for inserting data
+            const table = document.querySelector('#data-display tbody');
+            let dataMarkup = ``;
+            earningsData.forEach((timePeriod, index) => {
+                dataMarkup += generateRowHTML(timePeriod, index + 1)
+            });
+            // with the markup generated, insert it before the fixed numbers
+            table.innerHTML = dataMarkup;
+            // add a final row summarizing the data
+        }
+
+        function generateRowHTML(data, timePeriodNumber) {
+            const periodProfit = data.earnings - data.cost;
+            const profitOverBaseline = (periodProfit > window.periodBaselineProfit);
+
+            return `<tr>
+            <td>${timePeriodNumber}</td>
+            <td>${data.cost}</td>
+            <td>${data.earnings}</td>
+            <td>${periodProfit}</td>
+            <td class="${profitOverBaseline ? 'is-profit' : ''}">${periodProfit - window.periodBaselineProfit}</td>
+            </tr>`;
+        }
+
+    </script>
+</body>
+
+</html>
